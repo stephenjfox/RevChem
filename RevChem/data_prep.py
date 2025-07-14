@@ -4,7 +4,7 @@
 __all__ = ['align_data', 'df_to_coordinate_stream', 'translate_cornered_to_centered', 'translate_centered_to_cornered',
            'pl_translate_cornered_to_centered', 'pl_translate_centered_to_cornered']
 
-# %% ../nbs/02_data_inspect.ipynb 25
+# %% ../nbs/02_data_inspect.ipynb 27
 def align_data(
     tobii_df: pl.DataFrame, re_df: pl.DataFrame, *, asof_strategy="backward"
 ):
@@ -40,11 +40,11 @@ def align_data(
     )
     return df_aligned
 
-# %% ../nbs/02_data_inspect.ipynb 29
+# %% ../nbs/02_data_inspect.ipynb 32
 def df_to_coordinate_stream(df: pl.DataFrame, x_: str = "x", y_: str = "y"):
     return list(df[[x_, y_]].iter_rows())
 
-# %% ../nbs/02_data_inspect.ipynb 35
+# %% ../nbs/02_data_inspect.ipynb 39
 def translate_cornered_to_centered(
     coordinates: list[tuple[int | float, int | float]], X_max: int, Y_max: int
 ):
@@ -58,7 +58,7 @@ def translate_centered_to_cornered(
     "Translate the center-screen-origin coordinate to a top-left origin coordinate"
     return [(x + X_max // 2, Y_max // 2 - y) for (x, y) in coordinates]
 
-# %% ../nbs/02_data_inspect.ipynb 37
+# %% ../nbs/02_data_inspect.ipynb 43
 # the polars version of the above algorithms
 # written in this way to make them "functions".
 # Could just as easily cut a little code and then call "df.with_columns()" at the call-site

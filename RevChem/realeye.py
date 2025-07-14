@@ -58,7 +58,7 @@ def iter_parse_raw_data(raw_data: str) -> Iterable[Any]:
             case _:
                 raise ValueError(f"Should be unreachable state: {split_res = }")
 
-# %% ../nbs/00_exploration_tobii.ipynb 44
+# %% ../nbs/00_exploration_tobii.ipynb 45
 from dataclasses import dataclass
 
 @dataclass
@@ -74,7 +74,7 @@ class GazeInfo:
     mouse_pos_X: float
     mouse_pos_Y: float
 
-# %% ../nbs/00_exploration_tobii.ipynb 47
+# %% ../nbs/00_exploration_tobii.ipynb 49
 from functools import reduce
 from typing import NamedTuple
 

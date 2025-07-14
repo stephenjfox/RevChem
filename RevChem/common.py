@@ -4,9 +4,10 @@
 __all__ = ['T', 'group_by', 'partition', 'dt_str_now', 'date_str_now', 'list_concat']
 
 # %% ../nbs/00_common.ipynb 1
-from typing import Any, Iterable
-def group_by(grouper: 'Callable', items: Iterable[Any]) -> dict[any, any]:
-    from collections import defaultdict
+from collections import defaultdict
+from typing import Any, Callable, Iterable
+
+def group_by(grouper: Callable, items: Iterable[Any]) -> dict[any, any]:
     groups = defaultdict(list)
     for item in items:
         groups[grouper(item)].append(item)

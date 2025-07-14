@@ -109,20 +109,17 @@ def tobii_timestamp_to_datetime(
 
     return new_column
 
-# %% ../nbs/01_tobii_resolve.ipynb 36
+# %% ../nbs/01_tobii_resolve.ipynb 37
 from .realeye import iter_parse_raw_data
 
-# %% ../nbs/01_tobii_resolve.ipynb 38
+# %% ../nbs/01_tobii_resolve.ipynb 39
 from typing import Iterable
 def itersize(any_iter: Iterable) -> int:
     count = 0
     for _ in any_iter: count += 1
     return count
 
-# %% ../nbs/01_tobii_resolve.ipynb 39
-from pathlib import Path
-
-
+# %% ../nbs/01_tobii_resolve.ipynb 40
 def enhance_realeye_metadata(realeye_df: pl.DataFrame) -> pl.DataFrame:
     "Decorate the metadata with addition information"
     # use pl.Struct to dynamically instruct the strong typing in Rust (which drives Polars)
@@ -159,7 +156,7 @@ def read_realeye_raw_gazes_csv(
     else:
         return raw_csv
 
-# %% ../nbs/01_tobii_resolve.ipynb 42
+# %% ../nbs/01_tobii_resolve.ipynb 43
 from typing import NamedTuple
 from datetime import datetime
 
@@ -175,7 +172,7 @@ class RealEyeStruct(NamedTuple):
     def from_tuple(cls, tuple_) -> 'RealEyeStruct':
         return cls(*tuple_)
 
-# %% ../nbs/01_tobii_resolve.ipynb 43
+# %% ../nbs/01_tobii_resolve.ipynb 44
 from datetime import timedelta, datetime, UTC
 
 def unroll_realeye_dataframe_into_record_dataframes(df: pl.DataFrame):
@@ -212,7 +209,7 @@ def unroll_realeye_dataframe_into_record_dataframes(df: pl.DataFrame):
     
     return output_dfs
 
-# %% ../nbs/01_tobii_resolve.ipynb 44
+# %% ../nbs/01_tobii_resolve.ipynb 45
 # from RevChem.common import list_concat
 def list_concat(lists: list[list]) -> list:
     result = [
@@ -220,7 +217,7 @@ def list_concat(lists: list[list]) -> list:
     ]
     return result
 
-# %% ../nbs/01_tobii_resolve.ipynb 50
+# %% ../nbs/01_tobii_resolve.ipynb 51
 def apply(s, transform): return transform(s)
 
 def clean_tsv_file_name(fname: str) -> str:
@@ -233,7 +230,7 @@ def clean_tsv_file_name(fname: str) -> str:
 
     return reduce(apply, transformations, fname)
 
-# %% ../nbs/01_tobii_resolve.ipynb 55
+# %% ../nbs/01_tobii_resolve.ipynb 56
 from datetime import tzinfo, UTC
 from typing import TypeVar
 from .common import partition, Predicate
@@ -323,7 +320,7 @@ def filter_realeye_dfs_by_new_years_heuristics(
 
     return dfs
 
-# %% ../nbs/01_tobii_resolve.ipynb 61
+# %% ../nbs/01_tobii_resolve.ipynb 62
 from datetime import datetime, timedelta
 import random
 
@@ -335,7 +332,7 @@ def generate_random_datetimes(start, count, max_minutes_range):
     return [start + timedelta(minutes=random.randint(0, max_minutes_range)) for _ in range(count)]
 
 
-# %% ../nbs/01_tobii_resolve.ipynb 63
+# %% ../nbs/01_tobii_resolve.ipynb 64
 def find_tobii_realeye_df_pairs(
     tobii_dfs: list[pl.DataFrame], realeye_dfs: list[pl.DataFrame],
     *,
@@ -380,10 +377,10 @@ def find_tobii_realeye_df_pairs(
     ]
     return result
 
-# %% ../nbs/01_tobii_resolve.ipynb 67
+# %% ../nbs/01_tobii_resolve.ipynb 68
 from .common import dt_str_now, date_str_now
 
-# %% ../nbs/01_tobii_resolve.ipynb 68
+# %% ../nbs/01_tobii_resolve.ipynb 69
 def export_ordered_pairs(
     df_pairs: list[tuple[pl.DataFrame, pl.DataFrame]],
     *,
@@ -421,7 +418,7 @@ def export_ordered_pairs(
             print(f"Unexpected exception {e = }, {type(e) = }")
             print(f"{outputdir = }")
 
-# %% ../nbs/01_tobii_resolve.ipynb 76
+# %% ../nbs/01_tobii_resolve.ipynb 77
 from typing import Iterator
 from .realeye import GazeInfo, iter_parse_raw_data
 
@@ -466,7 +463,7 @@ class RealEyeRawRow:
     def from_row_tuples(cls, tuple) -> "RealEyeRawRow":
         return cls(*tuple)
 
-# %% ../nbs/01_tobii_resolve.ipynb 80
+# %% ../nbs/01_tobii_resolve.ipynb 81
 def cumulative_sum(items: list[int|float]) -> list[int|float]:
     """Calculate the cumulative sum up to and including a given index"""
     csum = 0
@@ -476,7 +473,7 @@ def cumulative_sum(items: list[int|float]) -> list[int|float]:
         res[i] = csum
     return res
 
-# %% ../nbs/01_tobii_resolve.ipynb 82
+# %% ../nbs/01_tobii_resolve.ipynb 83
 def raw_gazes_row_to_df(
     row: RealEyeRawRow, # typed row from the CSV. should have few, if any changes, from the raw CSV file. Used for semantic tidyness
     *,
@@ -506,7 +503,7 @@ def raw_gazes_row_to_df(
         pl.col("test_created_at").dt.replace_time_zone(time_zone="UTC"),
     )
 
-# %% ../nbs/01_tobii_resolve.ipynb 83
+# %% ../nbs/01_tobii_resolve.ipynb 84
 def run_realeye_df_group_statistics(dfs: list[pl.DataFrame]):
     grouped = group_by(lambda df: df["test_created_at"][0], dfs)
     group_statistics = pl.DataFrame(
@@ -518,7 +515,7 @@ def run_realeye_df_group_statistics(dfs: list[pl.DataFrame]):
         display(group_statistics)
     group_statistics.write_csv(EXPORT_ROOT / f"{dt_str_now()}-row_stats.csv")
 
-# %% ../nbs/01_tobii_resolve.ipynb 84
+# %% ../nbs/01_tobii_resolve.ipynb 85
 def realeye_timestamp_to_datetime(
     datetime_col: str = "test_created_at", # column with the recording start datetime
     timestamp_col: str = "time_ms_since_start", # the integer column representing the milliseconds since stimulus exposure
@@ -540,7 +537,7 @@ def realeye_timestamp_to_datetime(
 
     return new_column
 
-# %% ../nbs/01_tobii_resolve.ipynb 85
+# %% ../nbs/01_tobii_resolve.ipynb 86
 def correct_realeye_df_group(
     group_dfs: list[pl.DataFrame], *, time_col: str = "time_since_start"
 ):
@@ -578,7 +575,7 @@ def correct_realeye_df_group(
             )
         ).drop("__temp_start_time")
 
-# %% ../nbs/01_tobii_resolve.ipynb 86
+# %% ../nbs/01_tobii_resolve.ipynb 87
 # TODO: rename realeye data pipeline function
 def pipeline_raw_realeye_to_timed_dataframe(
     re_raw_df: pl.DataFrame,  # result of pl.read_csv("raw-gazes.csv").
@@ -633,5 +630,3 @@ def pipeline_raw_realeye_to_timed_dataframe(
 
     return mapped
 
-
-pipeline_raw_realeye_to_timed_dataframe(raw_gazes_csv)

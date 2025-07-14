@@ -1,0 +1,9 @@
+project:
+  output-dir: _docs
+
+website:
+  title: "RevChem"
+  site-url: "https://stephenjfox.github.io/RevChem"
+  description: "Python source code supporting the RevChem project."
+  repo-branch: master
+  repo-url: "https://github.com/stephenjfox/RevChem"
