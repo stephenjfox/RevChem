@@ -25,7 +25,7 @@ def iter_parse_raw_data(raw_data: str) -> Iterable[Any]:
             raise TypeError("Numbers string should be a str")
         if not numbers:
             raise ValueError(f"Receive {numbers} for argument 'numbers', excepted value")
-        if not "," in numbers:
+        if "," not in numbers:
             raise IndexError(f"Could not find comma in list argument {numbers}")
     
     def numbers_string_to_list(numbers: str) -> list[int|float]:
@@ -38,15 +38,16 @@ def iter_parse_raw_data(raw_data: str) -> Iterable[Any]:
     # convert from "[[...],[...],[...],[...]]" -> "...],[...],[...],[..."
     text_data_of_listlists = raw_data[2:-2].replace(" ", "") # delete whitespace
     # to ease the algorithm to follow
-    (numbers, rest) = split_res = text_data_of_listlists.split("],[", maxsplit=1) # one at a time.
+    CONST_SPLIT_TARGET = "],["
+    (numbers, rest) = split_res = text_data_of_listlists.split(CONST_SPLIT_TARGET, maxsplit=1) # one at a time.
     
     while split_res:
         test_numbers_str_invariant(numbers)
         yield numbers_string_to_list(numbers)
 
-        split_res = rest.split("],[", maxsplit=1) # one at a time.
+        split_res = rest.split(CONST_SPLIT_TARGET, maxsplit=1) # one at a time.
         match split_res:
-            case [_numbers, _rest]:
+            case [_, _]:
                 # iterate again
                 # print(f"Iterate: {numbers = }")
                 (numbers, rest) = split_res
@@ -58,7 +59,7 @@ def iter_parse_raw_data(raw_data: str) -> Iterable[Any]:
             case _:
                 raise ValueError(f"Should be unreachable state: {split_res = }")
 
-# %% ../nbs/00_exploration_tobii.ipynb 45
+# %% ../nbs/00_exploration_tobii.ipynb 44
 from dataclasses import dataclass
 
 @dataclass
@@ -74,7 +75,7 @@ class GazeInfo:
     mouse_pos_X: float
     mouse_pos_Y: float
 
-# %% ../nbs/00_exploration_tobii.ipynb 49
+# %% ../nbs/00_exploration_tobii.ipynb 48
 from functools import reduce
 from typing import NamedTuple
 
