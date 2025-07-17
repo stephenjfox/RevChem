@@ -304,9 +304,15 @@ def write_chunks_to_json(
 
 """
 Tobii dataframe
-│ timestamp                      ┆ X    ┆ Y    ┆ source_tsv       ┆ count │
-│ ---                            ┆ ---  ┆ ---  ┆ ---              ┆ ---   │
-│ datetime[μs, UTC]              ┆ i32  ┆ i32  ┆ str              ┆ i32   │
+│ timestamp                      ┆ X    ┆ Y    ┆ source_tsv   │
+│ ---                            ┆ ---  ┆ ---  ┆ ---          │
+│ datetime[μs, UTC]              ┆ i32  ┆ i32  ┆ str          │
+
+
+RealEye dataframe
+│ test_created_at         ┆ timestamp                   ┆ X    ┆ Y   │
+│ ---                     ┆ ---                         ┆ ---  ┆ --- │
+│ datetime[μs, UTC]       ┆ datetime[μs, UTC]           ┆ i32  ┆ i32 │
 """
 
 TOBII_POLARS_SCHEMA = {
@@ -314,13 +320,12 @@ TOBII_POLARS_SCHEMA = {
     "X": pl.Int32,
     "Y": pl.Int32,
     "source_tsv": pl.String,
-    "count": pl.Int32,
 }
 REALEYE_POLARS_SCHEMA = {
-    "participant_id": pl.String,
-    "item_id": pl.String,
     "test_created_at": pl.Datetime,
-    "test_rawa_data": pl.String,
+    "timestamp": pl.Datetime,
+    "X": pl.Int32,
+    "Y": pl.Int32,
 }
 
 
