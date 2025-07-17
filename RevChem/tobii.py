@@ -450,53 +450,7 @@ def unroll_realeye_df_counting_backwards(df: pl.DataFrame):
     return output_dfs
 
 
-# %% ../nbs/01_tobii_resolve.ipynb 49
-def unroll_realeye_df_counting_backwards(df: pl.DataFrame):
-    """Convert RealEye Raw record to the unrolled record, with the start_time interpreted as the end time.
-
-    Video evidence suggests that the start_time field is actually more like the "recording completed at" time
-    i.e. the end time.
-    """
-    time_inc = timedelta(seconds=1 / 30)  # 30 Hz data
-    dfs = []
-    for row in map(RealEyeStruct.from_tuple, df.rows()):
-        # we assert the RealEye dataframe is UTC timestamped, per the docs
-        # "timestamp": row.test_created_at.replace(tzinfo=UTC),
-        row_df = pl.DataFrame({
-            "X": [pairs["gaze_point_x"] for pairs in row.coordinate_pairs],
-            "Y": [pairs["gaze_point_y"] for pairs in row.coordinate_pairs],
-        })
-        dfs.append((row.test_created_at, row_df))
-
-    # group by -> concat all the columns -> count the time with all the data in order
-    # NOTE: grouping unique to the minute, which should be shared among RealEye, though the second may differ
-    # in particular, several entries are exactly 1 second apart.
-    # We assume the later of these entries is "next" chronologically.
-    grouped_dfs = group_by(lambda tup: tup[0], dfs)
-
-    # regroup
-    dfs = list_concat(grouped_dfs.values())
-    print(f"{type(dfs) = }, {type(dfs[0]) = }, {type(dfs[0][0]) = }  and {len(dfs) = }")
-    grouped_dfs = group_by(lambda tup: tup[0].replace(second=0, microsecond=0), dfs)
-
-    # transform the groups
-    output_dfs = []
-    for end_time, group in grouped_dfs.items():
-        concatted_df = pl.concat([df for _, df in group])
-        end_time = end_time.replace(tzinfo=UTC)  # concatted_df["timestamp"][0]
-        # assert end_time == end_time_, f"{end_time} != {end_time_}"
-        start_time = end_time - time_inc * (concatted_df.shape[0] - 1)
-
-        # overwrites the timestamp column by making a new "timestamp" column with the same name
-        df_with_time_corrected = concatted_df.with_columns(
-            timestamp=pl.datetime_range(start_time, end_time, time_inc)
-        )
-        output_dfs.append(df_with_time_corrected)
-
-    # flatten out the group values, again
-    return output_dfs
-
-# %% ../nbs/01_tobii_resolve.ipynb 54
+# %% ../nbs/01_tobii_resolve.ipynb 53
 def apply(s, transform): return transform(s)
 
 def clean_tsv_file_name(fname: str) -> str:
@@ -509,7 +463,7 @@ def clean_tsv_file_name(fname: str) -> str:
 
     return reduce(apply, transformations, fname)
 
-# %% ../nbs/01_tobii_resolve.ipynb 59
+# %% ../nbs/01_tobii_resolve.ipynb 58
 from datetime import tzinfo, UTC
 from typing import TypeVar
 from .common import partition, Predicate
@@ -599,7 +553,7 @@ def filter_realeye_dfs_by_new_years_heuristics(
 
     return dfs
 
-# %% ../nbs/01_tobii_resolve.ipynb 65
+# %% ../nbs/01_tobii_resolve.ipynb 64
 from datetime import datetime, timedelta
 import random
 
@@ -611,7 +565,7 @@ def generate_random_datetimes(start, count, max_minutes_range):
     return [start + timedelta(minutes=random.randint(0, max_minutes_range)) for _ in range(count)]
 
 
-# %% ../nbs/01_tobii_resolve.ipynb 67
+# %% ../nbs/01_tobii_resolve.ipynb 66
 def find_tobii_realeye_df_pairs(
     tobii_dfs: list[pl.DataFrame], realeye_dfs: list[pl.DataFrame],
     *,
@@ -655,10 +609,10 @@ def find_tobii_realeye_df_pairs(
     ]
     return result
 
-# %% ../nbs/01_tobii_resolve.ipynb 71
+# %% ../nbs/01_tobii_resolve.ipynb 70
 from .common import dt_str_now, date_str_now
 
-# %% ../nbs/01_tobii_resolve.ipynb 72
+# %% ../nbs/01_tobii_resolve.ipynb 71
 def export_ordered_pairs(
     df_pairs: list[tuple[pl.DataFrame, pl.DataFrame]],
     *,

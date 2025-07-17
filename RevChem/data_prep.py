@@ -4,6 +4,9 @@
 __all__ = ['align_data', 'df_to_coordinate_stream', 'translate_cornered_to_centered', 'translate_centered_to_cornered',
            'pl_translate_cornered_to_centered', 'pl_translate_centered_to_cornered']
 
+# %% ../nbs/02_data_inspect.ipynb 2
+import polars as pl
+
 # %% ../nbs/02_data_inspect.ipynb 27
 def align_data(
     tobii_df: pl.DataFrame, re_df: pl.DataFrame, *, asof_strategy="backward"
