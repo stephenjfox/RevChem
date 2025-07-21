@@ -90,6 +90,97 @@ def rolling_summary(df: pl.DataFrame, window: int) -> pl.DataFrame:
         # Optionally drop the helper columns here if you only want the stats
     )
 
+def fixation_segments(
+    df: pl.DataFrame,
+    radius: float,
+    *,
+    x: str = "x",
+    y: str = "y",
+    t: str = "t",
+    min_fixation_time: float | None = None,
+    min_n_points: int = 1,
+) -> pl.DataFrame:
+    """
+    Detect contiguous *fixation* segments in an eye-tracking trace.
+
+    TODO(stephen): Test this function and see if it does what it suggests.
+        I think the lack of iteration will be its undoing, but that's what
+        we're trying to see.
+    A fixation starts when the gaze stays **within `radius` units** from the
+    *anchor* point of that fixation for at least `min_fixation_time`
+    seconds (or `min_n_points` samples).  While the anchor is fixed,
+    every new point is tested against this anchor.  As soon as a point
+    exceeds the radius, the current fixation ends and a new anchor is set
+    at that point.
+
+    Parameters
+    ----------
+    df : pl.DataFrame
+        Must contain the columns `x`, `y`, and `t` (units are your own).
+    radius : float
+        Spatial tolerance (in the same units as x, y).
+    x, y, t : str
+        Column names for the spatial and temporal coordinates.
+    min_fixation_time : float, optional
+        Minimum duration (in the same units as `t`) for a segment to be
+        retained.  If None, `min_n_points` is the only filter.
+    min_n_points : int, default 1
+        Minimum number of consecutive points inside the radius.
+
+    Returns
+    -------
+    pl.DataFrame
+        One row per fixation segment with columns:
+        fixation_id   – unique id per fixation (monotonic)
+        t_start    – first timestamp of the fixation
+        t_end      – last timestamp of the fixation
+        x_anchor   – x-coordinate of the anchor point
+        y_anchor   – y-coordinate of the anchor point
+        duration   – t_end - t_start
+        n_points   – number of rows in the fixation
+    """
+    # Ensure ascending order
+    df = df.sort(t)
+
+    # Anchor point: the first point of each fixation
+    # FIXME(stephen): does this need to change??? Iterate?
+    anchor_x = pl.col(x).first()
+    anchor_y = pl.col(y).first()
+
+    # Boolean mask: inside radius?
+    inside = (
+        ((pl.col(x) - anchor_x) ** 2 + (pl.col(y) - anchor_y) ** 2).sqrt() <= radius
+    )
+
+    # Cumulative mask that resets when we step outside the radius
+    #  - cumsum() increments every time the condition flips from True→False
+    fixation_id = (~inside).cast(pl.Int32).cumsum()
+
+    # Aggregate per fixation_id
+    fixations = (
+        df.with_columns(fixation_id=fixation_id)
+        .group_by("fixation_id")
+        .agg(
+            t_start=pl.col(t).first(),
+            t_end=pl.col(t).last(),
+            x_anchor=pl.col(x).first(),
+            y_anchor=pl.col(y).first(),
+            n_points=pl.len(),
+        )
+        .with_columns(duration=pl.col("t_end") - pl.col("t_start"))
+    )
+
+    # Apply filters
+    if min_fixation_time is not None:
+        fixations = fixations.filter(pl.col("duration") >= min_fixation_time)
+    fixations = fixations.filter(pl.col("n_points") >= min_n_points)
+
+    # Optional: tidy up index
+    return fixations.with_columns(
+        fixation_id=pl.int_range(0, pl.len())
+    ).sort("t_start")
+
+
 
 def main():
     parser = argparse.ArgumentParser(description="Compute trajectory statistics.")
