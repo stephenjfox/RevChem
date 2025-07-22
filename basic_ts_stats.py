@@ -22,7 +22,6 @@ import argparse
 from pathlib import Path
 
 import polars as pl
-from polars import col
 
 
 def add_step_columns(df: pl.DataFrame) -> pl.DataFrame:
@@ -35,11 +34,11 @@ def add_step_columns(df: pl.DataFrame) -> pl.DataFrame:
         pl.col("x").shift(1).alias("x_prev"),
         pl.col("y").shift(1).alias("y_prev"),
     ).with_columns(
-        delta_x=col("x") - col("x_prev"),
-        delta_y=col("y") - col("y_prev"),
+        delta_x=pl.col("x") - pl.col("x_prev"),
+        delta_y=pl.col("y") - pl.col("y_prev"),
     ).with_columns(
-        delta_dist=(col("delta_x") ** 2 + col("delta_y") ** 2).sqrt(),
-        angle=pl.arctan2(col("delta_y"), col("delta_x")),
+        delta_dist=(pl.col("delta_x") ** 2 + pl.col("delta_y") ** 2).sqrt(),
+        angle=pl.arctan2(pl.col("delta_y"), pl.col("delta_x")),
     ).drop(["x_prev", "y_prev", "delta_x", "delta_y"])
 
 
@@ -48,21 +47,21 @@ def global_summary(df: pl.DataFrame) -> pl.DataFrame:
     Return a single-row DataFrame with global trajectory statistics.
     """
     return df.select(
-        total_distance=col("delta_dist").sum(),
-        avg_speed=col("delta_dist").mean(),
-        std_speed=col("delta_dist").std(),
-        min_speed=col("delta_dist").min(),
-        max_speed=col("delta_dist").max(),
+        total_distance=pl.col("delta_dist").sum(),
+        avg_speed=pl.col("delta_dist").mean(),
+        std_speed=pl.col("delta_dist").std(),
+        min_speed=pl.col("delta_dist").min(),
+        max_speed=pl.col("delta_dist").max(),
         net_displacement=(
-            (col("x").last() - col("x").first()) ** 2
-            + (col("y").last() - col("y").first()) ** 2
+            (pl.col("x").last() - pl.col("x").first()) ** 2
+            + (pl.col("y").last() - pl.col("y").first()) ** 2
         ).sqrt(),
-        total_time=col("t").last() - col("t").first(),
+        total_time=pl.col("t").last() - pl.col("t").first(),
         sinuosity=(
-            col("delta_dist").sum()
+            pl.col("delta_dist").sum()
             / (
-                (col("x").last() - col("x").first()) ** 2
-                + (col("y").last() - col("y").first()) ** 2
+                (pl.col("x").last() - pl.col("x").first()) ** 2
+                + (pl.col("y").last() - pl.col("y").first()) ** 2
             ).sqrt()
         ),
     )
@@ -74,16 +73,16 @@ def rolling_summary(df: pl.DataFrame, window: int) -> pl.DataFrame:
     """
     return (
         df.with_columns(
-            roll_speed_mean=col("delta_dist")
+            roll_speed_mean=pl.col("delta_dist")
             .rolling_mean(window_size=window, min_periods=1)
             .alias("speed_mean"),
-            roll_speed_std=col("delta_dist")
+            roll_speed_std=pl.col("delta_dist")
             .rolling_std(window_size=window, min_periods=1)
             .alias("speed_std"),
-            roll_angle_mean=col("angle")
+            roll_angle_mean=pl.col("angle")
             .rolling_mean(window_size=window, min_periods=1)
             .alias("angle_mean"),
-            roll_angle_std=col("angle")
+            roll_angle_std=pl.col("angle")
             .rolling_std(window_size=window, min_periods=1)
             .alias("angle_std"),
         )
