@@ -228,6 +228,70 @@ def fixation_segments(
     )
 
 
+def aoi_from_fixations(
+    fixations: pl.DataFrame, eps: float, min_samples: int
+) -> pl.DataFrame:
+    """
+    Identify Areas of Interest (AOIs) from fixation data using DBSCAN.
+
+    Parameters
+    ----------
+    fixations : pl.DataFrame
+        A DataFrame of fixation data, as returned by `fixation_segments`.
+        Must contain `x_anchor` and `y_anchor` columns.
+    eps : float
+        The maximum distance between two samples for one to be considered
+        as in the neighborhood of the other.
+    min_samples : int
+        The number of samples in a neighborhood for a point to be
+        considered as a core point.
+
+    Returns
+    -------
+    pl.DataFrame
+        A DataFrame with AOI statistics, including the number of fixations
+        in each AOI, the total duration, and the bounding box of the AOI.
+    """
+    if fixations.is_empty():
+        return pl.DataFrame(
+            {
+                "aoi_id": pl.Series(dtype=pl.Int64),
+                "n_fixations": pl.Series(dtype=pl.Int64),
+                "total_duration": pl.Series(dtype=pl.Int64),
+                "x_min": pl.Series(dtype=pl.Float64),
+                "y_min": pl.Series(dtype=pl.Float64),
+                "x_max": pl.Series(dtype=pl.Float64),
+                "y_max": pl.Series(dtype=pl.Float64),
+            }
+        )
+
+    from sklearn.cluster import DBSCAN
+
+    # Extract anchor points for clustering
+    coords = fixations.select(["x_anchor", "y_anchor"]).to_numpy()
+
+    # Perform DBSCAN clustering
+    db = DBSCAN(eps=eps, min_samples=min_samples).fit(coords)
+    labels = db.labels_
+
+    # Add cluster labels to fixations DataFrame
+    fixations = fixations.with_columns(aoi_id=pl.Series(labels))
+
+    # Filter out noise points (label -1)
+    aois = fixations.filter(pl.col("aoi_id") != -1)
+
+    # Aggregate statistics per AOI
+    aoi_stats = aois.group_by("aoi_id").agg(
+        n_fixations=pl.len(),
+        total_duration=pl.col("duration").sum(),
+        x_min=pl.col("x_anchor").min(),
+        y_min=pl.col("y_anchor").min(),
+        x_max=pl.col("x_anchor").max(),
+        y_max=pl.col("y_anchor").max(),
+    )
+
+    return aoi_stats.sort("aoi_id")
+
 
 def main():
     parser = argparse.ArgumentParser(description="Compute trajectory statistics.")

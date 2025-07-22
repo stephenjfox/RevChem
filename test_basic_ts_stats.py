@@ -2,7 +2,7 @@ import polars as pl
 import pytest
 from polars.testing import assert_frame_equal
 
-from basic_ts_stats import fixation_segments
+from basic_ts_stats import aoi_from_fixations, fixation_segments
 
 
 @pytest.fixture
@@ -113,3 +113,21 @@ def test_min_n_points(sample_trace_multiple_fixations):
         sample_trace_multiple_fixations, radius=1.0, min_n_points=4
     )
     assert result_filtered.is_empty()
+
+
+def test_aoi_from_fixations(sample_trace_multiple_fixations):
+    """Test the aoi_from_fixations function."""
+    fixations = fixation_segments(sample_trace_multiple_fixations, radius=1.0)
+    result = aoi_from_fixations(fixations, eps=1.0, min_samples=2)
+    expected = pl.DataFrame(
+        {
+            "aoi_id": [0],
+            "n_fixations": [2],
+            "total_duration": [4],
+            "x_min": [0.0],
+            "y_min": [0.0],
+            "x_max": [0.0],
+            "y_max": [0.0],
+        }
+    )
+    assert_frame_equal(result, expected, check_dtypes=False)
