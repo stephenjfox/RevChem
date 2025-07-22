@@ -1,0 +1,228 @@
+#!/usr/bin/env python3
+"""
+trajectory_stats.py
+Compute time-series statistics on a sequence of 2-D coordinates.
+
+The CSV must contain at least the columns
+    x, y, t
+where
+    x, y : float   (spatial coordinates)
+    t    : int/float/datetime (time stamp, monotonically increasing)
+
+The script adds
+    delta_dist  – Euclidean distance to previous point
+    angle       – absolute direction of the segment (radians, 0 = East, CCW)
+
+and then outputs
+    global_stats – overall summary
+    rolling_stats– rolling window stats (mean / std / min / max of speed & angle)
+"""
+
+import argparse
+from pathlib import Path
+
+import polars as pl
+from polars import col
+
+
+def add_step_columns(df: pl.DataFrame) -> pl.DataFrame:
+    """
+    Add delta_dist and angle to the DataFrame.
+    Assumes rows are already sorted by `t`.
+    """
+    return df.with_columns(
+        # previous x, y
+        pl.col("x").shift(1).alias("x_prev"),
+        pl.col("y").shift(1).alias("y_prev"),
+    ).with_columns(
+        delta_x=col("x") - col("x_prev"),
+        delta_y=col("y") - col("y_prev"),
+    ).with_columns(
+        delta_dist=(col("delta_x") ** 2 + col("delta_y") ** 2).sqrt(),
+        angle=pl.arctan2(col("delta_y"), col("delta_x")),
+    ).drop(["x_prev", "y_prev", "delta_x", "delta_y"])
+
+
+def global_summary(df: pl.DataFrame) -> pl.DataFrame:
+    """
+    Return a single-row DataFrame with global trajectory statistics.
+    """
+    return df.select(
+        total_distance=col("delta_dist").sum(),
+        avg_speed=col("delta_dist").mean(),
+        std_speed=col("delta_dist").std(),
+        min_speed=col("delta_dist").min(),
+        max_speed=col("delta_dist").max(),
+        net_displacement=(
+            (col("x").last() - col("x").first()) ** 2
+            + (col("y").last() - col("y").first()) ** 2
+        ).sqrt(),
+        total_time=col("t").last() - col("t").first(),
+        sinuosity=(
+            col("delta_dist").sum()
+            / (
+                (col("x").last() - col("x").first()) ** 2
+                + (col("y").last() - col("y").first()) ** 2
+            ).sqrt()
+        ),
+    )
+
+
+def rolling_summary(df: pl.DataFrame, window: int) -> pl.DataFrame:
+    """
+    Rolling statistics on speed and angle.
+    """
+    return (
+        df.with_columns(
+            roll_speed_mean=col("delta_dist")
+            .rolling_mean(window_size=window, min_periods=1)
+            .alias("speed_mean"),
+            roll_speed_std=col("delta_dist")
+            .rolling_std(window_size=window, min_periods=1)
+            .alias("speed_std"),
+            roll_angle_mean=col("angle")
+            .rolling_mean(window_size=window, min_periods=1)
+            .alias("angle_mean"),
+            roll_angle_std=col("angle")
+            .rolling_std(window_size=window, min_periods=1)
+            .alias("angle_std"),
+        )
+        # Optionally drop the helper columns here if you only want the stats
+    )
+
+def fixation_segments(
+    df: pl.DataFrame,
+    radius: float,
+    *,
+    x: str = "x",
+    y: str = "y",
+    t: str = "t",
+    min_fixation_time: float | None = None,
+    min_n_points: int = 1,
+) -> pl.DataFrame:
+    """
+    Detect contiguous *fixation* segments in an eye-tracking trace.
+
+    TODO(stephen): Test this function and see if it does what it suggests.
+        I think the lack of iteration will be its undoing, but that's what
+        we're trying to see.
+    A fixation starts when the gaze stays **within `radius` units** from the
+    *anchor* point of that fixation for at least `min_fixation_time`
+    seconds (or `min_n_points` samples).  While the anchor is fixed,
+    every new point is tested against this anchor.  As soon as a point
+    exceeds the radius, the current fixation ends and a new anchor is set
+    at that point.
+
+    Parameters
+    ----------
+    df : pl.DataFrame
+        Must contain the columns `x`, `y`, and `t` (units are your own).
+    radius : float
+        Spatial tolerance (in the same units as x, y).
+    x, y, t : str
+        Column names for the spatial and temporal coordinates.
+    min_fixation_time : float, optional
+        Minimum duration (in the same units as `t`) for a segment to be
+        retained.  If None, `min_n_points` is the only filter.
+    min_n_points : int, default 1
+        Minimum number of consecutive points inside the radius.
+
+    Returns
+    -------
+    pl.DataFrame
+        One row per fixation segment with columns:
+        fixation_id   – unique id per fixation (monotonic)
+        t_start    – first timestamp of the fixation
+        t_end      – last timestamp of the fixation
+        x_anchor   – x-coordinate of the anchor point
+        y_anchor   – y-coordinate of the anchor point
+        duration   – t_end - t_start
+        n_points   – number of rows in the fixation
+    """
+    # Ensure ascending order
+    df = df.sort(t)
+
+    # Anchor point: the first point of each fixation
+    # FIXME(stephen): does this need to change??? Iterate?
+    anchor_x = pl.col(x).first()
+    anchor_y = pl.col(y).first()
+
+    # Boolean mask: inside radius?
+    inside = (
+        ((pl.col(x) - anchor_x) ** 2 + (pl.col(y) - anchor_y) ** 2).sqrt() <= radius
+    )
+
+    # Cumulative mask that resets when we step outside the radius
+    #  - cumsum() increments every time the condition flips from True→False
+    fixation_id = (~inside).cast(pl.Int32).cumsum()
+
+    # Aggregate per fixation_id
+    fixations = (
+        df.with_columns(fixation_id=fixation_id)
+        .group_by("fixation_id")
+        .agg(
+            t_start=pl.col(t).first(),
+            t_end=pl.col(t).last(),
+            x_anchor=pl.col(x).first(),
+            y_anchor=pl.col(y).first(),
+            n_points=pl.len(),
+        )
+        .with_columns(duration=pl.col("t_end") - pl.col("t_start"))
+    )
+
+    # Apply filters
+    if min_fixation_time is not None:
+        fixations = fixations.filter(pl.col("duration") >= min_fixation_time)
+    fixations = fixations.filter(pl.col("n_points") >= min_n_points)
+
+    # Optional: tidy up index
+    return fixations.with_columns(
+        fixation_id=pl.int_range(0, pl.len())
+    ).sort("t_start")
+
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Compute trajectory statistics.")
+    parser.add_argument("--csv", required=True, type=Path, help="Path to CSV file")
+    parser.add_argument("--x_col", default="x", help="name of x-coordinate column")
+    parser.add_argument("--y_col", default="y", help="name of y-coordinate column")
+    parser.add_argument("--time_col", default="t", help="name of time column")
+    parser.add_argument(
+        "--window", type=int, default=100, help="rolling window size (#rows)"
+    )
+    parser.add_argument(
+        "--out", type=Path, default=None, help="write rolling stats to this CSV"
+    )
+    args = parser.parse_args()
+
+    # Read and ensure ascending by time
+    df = (
+        pl.read_csv(args.csv)
+        .select(
+            pl.col(args.x_col).cast(pl.Float64).alias("x"),
+            pl.col(args.y_col).cast(pl.Float64).alias("y"),
+            pl.col(args.time_col).alias("t"),
+        )
+        .sort("t")
+    )
+
+    df = add_step_columns(df)
+
+    # Global summary
+    g = global_summary(df)
+    print("=== Global trajectory statistics ===")
+    print(g)
+
+    # Rolling stats
+    r = rolling_summary(df, args.window)
+    if args.out:
+        r.write_csv(args.out)
+        print(f"\nRolling stats written to {args.out}")
+    else:
+        print("\n=== Rolling statistics (first 20 rows) ===")
+        print(r.head(20))
+
+
+if __name__ == "__main__":
+    main()
