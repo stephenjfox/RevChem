@@ -29,17 +29,17 @@ def add_step_columns(df: pl.DataFrame) -> pl.DataFrame:
     Add delta_dist and angle to the DataFrame.
     Assumes rows are already sorted by `t`.
     """
-    return df.with_columns(
-        # previous x, y
-        pl.col("x").shift(1).alias("x_prev"),
-        pl.col("y").shift(1).alias("y_prev"),
-    ).with_columns(
-        delta_x=pl.col("x") - pl.col("x_prev"),
-        delta_y=pl.col("y") - pl.col("y_prev"),
-    ).with_columns(
-        delta_dist=(pl.col("delta_x") ** 2 + pl.col("delta_y") ** 2).sqrt(),
-        angle=pl.arctan2(pl.col("delta_y"), pl.col("delta_x")),
-    ).drop(["x_prev", "y_prev", "delta_x", "delta_y"])
+    return (
+        df.with_columns(
+            delta_x=pl.col("x").diff().fill_null(0.0),
+            delta_y=pl.col("y").diff().fill_null(0.0),
+        )
+        .with_columns(
+            delta_dist=(pl.col("delta_x") ** 2 + pl.col("delta_y") ** 2).sqrt(),
+            angle=pl.arctan2(pl.col("delta_y"), pl.col("delta_x")),
+        )
+        .drop(["delta_x", "delta_y"])
+    )
 
 
 def global_summary(df: pl.DataFrame) -> pl.DataFrame:
@@ -88,6 +88,7 @@ def rolling_summary(df: pl.DataFrame, window: int) -> pl.DataFrame:
         )
         # Optionally drop the helper columns here if you only want the stats
     )
+
 
 def fixation_segments(
     df: pl.DataFrame,
@@ -251,7 +252,14 @@ def aoi_from_fixations(
         A DataFrame with AOI statistics, including the number of fixations
         in each AOI, the total duration, and the bounding box of the AOI.
     """
-    if fixations.is_empty():
+    try:
+        from sklearn.cluster import DBSCAN
+
+        failed_import = False
+    except ImportError:
+        failed_import = True
+
+    if fixations.is_empty() or failed_import:
         return pl.DataFrame(
             {
                 "aoi_id": pl.Series(dtype=pl.Int64),
@@ -263,8 +271,6 @@ def aoi_from_fixations(
                 "y_max": pl.Series(dtype=pl.Float64),
             }
         )
-
-    from sklearn.cluster import DBSCAN
 
     # Extract anchor points for clustering
     coords = fixations.select(["x_anchor", "y_anchor"]).to_numpy()
