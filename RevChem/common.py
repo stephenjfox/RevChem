@@ -33,7 +33,7 @@ def partition(
     
     return matches, misses
 
-# %% ../nbs/00_common.ipynb 4
+# %% ../nbs/00_common.ipynb 5
 def first(iterable):
     _it = iter(iterable)
     return next(_it)
@@ -44,7 +44,7 @@ def second(iterable):
 fst = first
 snd = second
 
-# %% ../nbs/00_common.ipynb 5
+# %% ../nbs/00_common.ipynb 8
 from datetime import datetime, UTC
 
 def dt_str_now() -> str:
@@ -65,7 +65,7 @@ def datetime_to_stamp(dt: datetime = None) -> str:
 # stamp = datetime_to_stamp()  # Returns current time in YYYYMMDDHHMM format
 
 
-# %% ../nbs/00_common.ipynb 6
+# %% ../nbs/00_common.ipynb 9
 def list_concat(lists: list[list]) -> list:
     result = [
         item for l_ in lists for item in l_
