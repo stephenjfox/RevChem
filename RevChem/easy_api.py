@@ -22,22 +22,97 @@ from .tobii import COLUMN_RENAMING_TOBII_TO_CSV
 
 
 # %% ../nbs/07_high_level_api.ipynb 4
+from .common import datetime_to_stamp
+from .realeye import read_realeye_csv
+from RevChem.data.export import (
+    load_tobii_individual,
+    rekeyed, # needed for the patch to GroupFrames, used on
+)
+from .tobii import COLUMNS_TOBII
+
+
 def generate_participant_videos_from_files(
     realeye_csv_path: str,
     tobii_tsv_dir_path: str,
     video_output_dir: str,
     *,
-    use_cache: bool = True
+    realeye_stimulus_items_in_order: list[str],
+    stimuli_image_paths: list[str | Path],
+    use_cache: bool = True,
 ):
-    """Uses RevChem low-level modules to produce an MP4 from the provided data
+    """Uses RevChem low-level modules to produce MP4s from the provided data for a whole directory of participants.
 
     Args:
         realeye_csv_path: absolute or relative path to the "raw gazes" CSV
         tobii_tsv_dir_path: absolute or relative path to the directory of all associated Tobii data
-        video_output_path: 
-        use_cache: _description_. Defaults to True.
+        video_output_dir: Directory with write permissions, where the MP4 will be written
+        use_cache: Whether to save the data to disk. Defaults to True.
+        realeye_stimulus_items_in_order: Identifiers of the stimuli provided in/through RealEye, in the order
+            the are presented.
+            Originally, we intended to do this ordering programmatically, but were thwarted by the fact that
+            RealEye's output rows are not ordered by "display order" but the order in which the stimuli were
+            loaded into the system. For those of us that show the same stimuli multiple times, this makes
+            downstream data near-useless, no matter how we true to infer the timing of RealEye data.
+            (See those functions for more of that story.) The easiest way to comply with this is to go into the
+            RealEye UI, inspect the order in which you are showing your images, and to copy-paste in-order the
+            stimuli "Item ID"s as they appear. The order in the exported raw-gazes(-denoised).csv are not
+            guaranteed to be accurate.
+        stimuli_image_paths: Paths to the images to be shown as stimuli, in order.
+            The easiest way to comply with this is to (very easily) download the stimuli to an isolated folder
+            on your test machine, name then in lexicographical order (such that when you "Sort by Name"
+            in File Explorer or Finder, they are in the order you would show a participant) and then load them
+            with
+            >>> from pathlib import Path
+            >>> stimuli_image_paths = sorted(Path("my isolated stimuli directory").glob("*.jpg"))
     """
-    # TODO
+    # 1. Load and process RealEye data
+    re_df = read_realeye_csv(realeye_csv_path)
+    re_timed_dfs = pipeline_raw_realeye_to_timed_dataframe(
+        re_df,
+        item_ids_in_order=realeye_stimulus_items_in_order,
+        dt_timestamp_col="timestamp",
+    )
+
+    # 2. Load and process Tobii data
+    tobii_files = sorted(Path(tobii_tsv_dir_path).glob("*.tsv"))
+    tobii_dfs = [
+        load_tobii_individual(
+            f, columns=COLUMNS_TOBII, renaming=COLUMN_RENAMING_TOBII_TO_CSV
+        )
+        for f in tobii_files
+    ]
+
+    # 3. Match Tobii and RealEye data
+    matched_data = match_tobii_to_realeye_groups(
+        tobii_dfs,
+        re_timed_dfs.rekeyed(
+            lambda _, dfs: min(
+                df["timestamp"].min() for df in dfs
+            )  # smallest time is the RE start time
+        ),
+    )
+
+    # 4. Join data into segments
+    segmented_data = join_chunks_as_segments(matched_data, null_handling="complex")
+
+    # 5. Render videos
+    run_output_dir_name = f"RevChem-Output-{datetime_to_stamp()}"
+    for tobii_file in tobii_files:
+        trial_data = select_trial(tobii_file.name, segmented_data)
+        if trial_data is None:
+            print(f"No trial data found for {tobii_file.name}, skipping video generation.")
+            continue
+
+        output_path = Path(video_output_dir, run_output_dir_name, f"{trial_data.trial_name_or_id}.mp4")
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+
+        render_point_stream_video_with_opencv(
+            stimuli_image_paths,
+            trial_data,
+            output_file_name=output_path.expanduser().as_posix(),
+            export_fps=60,
+            n_images_to_show=4,
+        )
 
 # %% ../nbs/07_high_level_api.ipynb 5
 from .common import datetime_to_stamp
