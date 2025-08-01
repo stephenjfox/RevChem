@@ -389,7 +389,8 @@ class GroupedFrames(Generic[K, DF]):
         Returns:
             Dict[K, R]: A dictionary mapping each key to the result of the function.
         """
-        return {key: func(key, frames) for key, frames in self.items()}
+        return {key: func(key, frames, **kwargs) for key, frames in self.items()}
+    
 
 # %% ../nbs/01_tobii_resolve.ipynb 48
 def count_group_backwards(
