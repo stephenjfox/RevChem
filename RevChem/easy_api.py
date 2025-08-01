@@ -90,7 +90,7 @@ def generate_single_participant_video_from_files(
     )
 
     # 4. Join data into segments
-    segmented_data = join_chunks_as_segments(matched_data, drop_null=True)
+    segmented_data = join_chunks_as_segments(matched_data, null_handling="complex")
 
     # 5. Render video
     trial_data = select_trial(Path(tobii_tsv_path).name, segmented_data)
