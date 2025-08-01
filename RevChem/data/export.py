@@ -4,9 +4,10 @@
 __all__ = ['T_source', 'T_out', 'EXPORT_ROOT', 'TOBII_POLARS_SCHEMA', 'REALEYE_POLARS_SCHEMA', 'Resettable',
            'iter_parse_raw_to_GazeInfo', 'resettable_iter_raw', 'RealEyeRawRow', 'cumulative_sum',
            'raw_gazes_row_to_df', 'run_realeye_df_group_statistics', 'realeye_timestamp_to_datetime',
-           'correct_realeye_df_group', 'pipeline_raw_realeye_to_timed_dataframe', 'pipeline_tobii_directory_to_all_dfs',
-           'prepare_chunk_for_json', 'write_chunks_to_json', 'read_chunks_from_json', 'write_chunks_to_parquet',
-           'read_chunks_from_parquet', 'match_tobii_to_realeye_groups']
+           'correct_realeye_df_group', 'pipeline_raw_realeye_to_timed_dataframe', 'load_tobii_individual',
+           'pipeline_tobii_directory_to_all_dfs', 'prepare_chunk_for_json', 'write_chunks_to_json',
+           'read_chunks_from_json', 'write_chunks_to_parquet', 'read_chunks_from_parquet',
+           'match_tobii_to_realeye_groups']
 
 # %% ../../nbs/02_data_export_clean.ipynb 2
 import polars as pl
@@ -15,7 +16,7 @@ from pathlib import Path
 from typing import Callable, Iterable, Iterator, TypeVar, Union
 
 
-# %% ../../nbs/02_data_export_clean.ipynb 7
+# %% ../../nbs/02_data_export_clean.ipynb 8
 from dataclasses import dataclass
 from ..realeye import GazeInfo, iter_parse_raw_data
 
@@ -60,7 +61,7 @@ class RealEyeRawRow:
     def from_row_tuples(cls, tuple) -> "RealEyeRawRow":
         return cls(*tuple)
 
-# %% ../../nbs/02_data_export_clean.ipynb 9
+# %% ../../nbs/02_data_export_clean.ipynb 10
 def cumulative_sum(items: list[int|float]) -> list[int|float]:
     """Calculate the cumulative sum up to and including a given index"""
     csum = 0
@@ -70,7 +71,7 @@ def cumulative_sum(items: list[int|float]) -> list[int|float]:
         res[i] = csum
     return res
 
-# %% ../../nbs/02_data_export_clean.ipynb 11
+# %% ../../nbs/02_data_export_clean.ipynb 12
 def raw_gazes_row_to_df(
     row: RealEyeRawRow, # typed row from the CSV. should have few, if any changes, from the raw CSV file. Used for semantic tidyness
     *,
@@ -104,10 +105,10 @@ def raw_gazes_row_to_df(
         pl.col("test_created_at").dt.replace_time_zone(time_zone="UTC"),
     )
 
-# %% ../../nbs/02_data_export_clean.ipynb 12
+# %% ../../nbs/02_data_export_clean.ipynb 13
 from ..common import dt_str_now, group_by
 
-# %% ../../nbs/02_data_export_clean.ipynb 13
+# %% ../../nbs/02_data_export_clean.ipynb 14
 from tempfile import TemporaryDirectory
 EXPORT_ROOT = Path(TemporaryDirectory(delete=False).name, f"{dt_str_now()}-python-outputs").resolve()
 EXPORT_ROOT.mkdir(parents=True, exist_ok=True)
@@ -122,7 +123,7 @@ def run_realeye_df_group_statistics(dfs: list[pl.DataFrame]):
         display(group_statistics)
     group_statistics.write_csv(EXPORT_ROOT / f"{dt_str_now()}-row_stats.csv")
 
-# %% ../../nbs/02_data_export_clean.ipynb 15
+# %% ../../nbs/02_data_export_clean.ipynb 16
 def realeye_timestamp_to_datetime(
     datetime_col: str = "test_created_at", # column with the recording start datetime
     timestamp_col: str = "time_ms_since_start", # the integer column representing the milliseconds since stimulus exposure
@@ -144,7 +145,7 @@ def realeye_timestamp_to_datetime(
 
     return new_column
 
-# %% ../../nbs/02_data_export_clean.ipynb 16
+# %% ../../nbs/02_data_export_clean.ipynb 17
 def correct_realeye_df_group(
     group_dfs: list[pl.DataFrame], *, time_col: str = "time_since_start"
 ):
@@ -189,7 +190,7 @@ def correct_realeye_df_group(
     
     return output_dfs
 
-# %% ../../nbs/02_data_export_clean.ipynb 17
+# %% ../../nbs/02_data_export_clean.ipynb 18
 from ..tobii import REALEYE_ITEM_IDS, GroupedFrames
 
 # determined by inspection of the duration and the path of the trajectories
@@ -197,7 +198,7 @@ _INFERRED_CU_CUA_CORRECT_INDICES = [0, 1, 2, 3, 5, 6, 4, 9, 7, 8]
 # NOTE(stephen): if a future dev wants to switch it to slices (why???), here: [0:4] + [5:7] + [4] + [9, 7, 8]
 _INFERRED_CU_CUA_CORRECT_ITEM_IDS = [REALEYE_ITEM_IDS[i] for i in _INFERRED_CU_CUA_CORRECT_INDICES]
 
-# %% ../../nbs/02_data_export_clean.ipynb 18
+# %% ../../nbs/02_data_export_clean.ipynb 19
 # TODO: rename realeye data pipeline function
 def pipeline_raw_realeye_to_timed_dataframe(
     re_raw_df: pl.DataFrame,  # result of pl.read_csv("raw-gazes.csv").
@@ -246,7 +247,7 @@ def pipeline_raw_realeye_to_timed_dataframe(
 
     return mapped
 
-# %% ../../nbs/02_data_export_clean.ipynb 22
+# %% ../../nbs/02_data_export_clean.ipynb 23
 # full Tobii pipeline is just a few lines of code
 from RevChem.tobii import (
     COLUMNS_TOBII,
@@ -256,17 +257,68 @@ from RevChem.tobii import (
 )
 
 
+def load_tobii_individual(
+    tsv_file: str | Path,
+    columns: list[str] = None,
+    renaming: dict[str, str] = None,
+    *,
+    clean_func=(lambda s: s),
+):
+    """Load a single tobii trial from the given file path, applying all typing and conveniences per project defaults
+
+    Args:
+        tsv_file: Path to the <trial>.tsv
+        columns: Optional subset of columns. If None, returns all columns.
+                Behavior of invalid, non-None arguments is undefined.
+        renaming: Optional renaming of any columns, with respect to `columns` argument and its behavior.
+                Direct passthrough to `pl.DataFrame.rename(self, mapping, *, strict=True)`. See
+                https://docs.pola.rs/api/python/stable/reference/dataframe/api/polars.DataFrame.rename.html
+                for more on behavior.
+        clean_func: function to apply to "clean" or otherwise change the name of the TSV, which will be store
+                in the `source_tsv` column of the loaded DataFrame
+    Returns:
+        DataFrame of the Tobii trial, transformed per the stated arguments.
+    """
+    tobii_data = read_tobii_individual_tsv(tsv_file)
+    if columns:
+        tobii_data = tobii_data[columns]
+
+    source_tsv_name = clean_func(Path(tsv_file).name)
+    return tobii_data.rename(renaming).with_columns(source_tsv=pl.lit(source_tsv_name))
+
+
 def pipeline_tobii_directory_to_all_dfs(
-    directory_of_individual_tobii_sessions: str,
+    directory_of_individual_tobii_sessions: str | Path,
     *,
     columns_subset: list[str] = COLUMNS_TOBII,
     column_renaming: dict[str, str] = {},
 ) -> list[pl.DataFrame]:
+    """Load the Tobii directory of TSVs as the RevChem team did. Not recommended, loop `load_tobii_individual(...)` instead.
+
+    Args:
+        directory_of_individual_tobii_sessions: Directory where all the Tobii travel TSVs reside. MUST BE VALID TSVs
+        columns_subset: Optional subset of columns. See `load_tobii_individual` for more. Defaults to COLUMNS_TOBII.
+        column_renaming: Optional renaming of any columns, after `columns` subset is taken.
+                Read `load_tobii_individual` for more. Defaults to {} (the empty dict).
+
+    Returns:
+        _description_
+    """
+    if not isinstance(directory_of_individual_tobii_sessions, Path):
+        directory_of_individual_tobii_sessions = Path(
+            directory_of_individual_tobii_sessions
+        )
+
+    # make sure any shorthand is resolved, first
+    directory_of_individual_tobii_sessions = (
+        directory_of_individual_tobii_sessions.expanduser().resolve()
+    )
+
     all_tobii_dfs = [
-        read_tobii_individual_tsv(tsv_file)[columns_subset]
-        .rename(column_renaming)
-        .with_columns(source_tsv=pl.lit(clean_tsv_file_name(tsv_file.name)))
-        for tsv_file in Path(directory_of_individual_tobii_sessions).iterdir()
+        load_tobii_individual(
+            tsv_file, columns=columns_subset, renaming=column_renaming
+        )
+        for tsv_file in directory_of_individual_tobii_sessions.glob("*.tsv")
     ]
     all_tobii_dfs = filter_tobii_dfs_by_new_years_heuristics(
         # filter_to_newyear_and_sort_by_timestamp(all_tobii_data_as_exportable)
@@ -275,7 +327,8 @@ def pipeline_tobii_directory_to_all_dfs(
 
     return all_tobii_dfs
 
-# %% ../../nbs/02_data_export_clean.ipynb 25
+
+# %% ../../nbs/02_data_export_clean.ipynb 26
 import json
 import gzip
 from typing import Any, List, Tuple
@@ -457,7 +510,7 @@ def read_chunks_from_parquet(
 
     return chunk_associations
 
-# %% ../../nbs/02_data_export_clean.ipynb 27
+# %% ../../nbs/02_data_export_clean.ipynb 28
 def match_tobii_to_realeye_groups(
     tobii_dfs: List[pl.DataFrame],
     realeye_groups: GroupedFrames,
@@ -496,7 +549,7 @@ def match_tobii_to_realeye_groups(
     return result
 
 
-# %% ../../nbs/02_data_export_clean.ipynb 28
+# %% ../../nbs/02_data_export_clean.ipynb 29
 from fastcore.utils import patch
 from ..tobii import K, DF, R
 

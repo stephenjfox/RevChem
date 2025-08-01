@@ -16,14 +16,20 @@ class AssociatedTrialSegements(NamedTuple):
     segments: list[pl.DataFrame]
 
 # %% ../../nbs/05_image_gen_by_segments.ipynb 6
+from typing import Literal
+
+_AsOfStrategy = Literal["backward", "forward", "nearest"]  # AsofStrategy (polars')
+_NullStrategy = Literal["drop", "forward", "backward", "complex"] # Null Strategy (ours)
 def join_chunks_as_segments(
     associated_chunks: list[tuple[pl.DataFrame, list[pl.DataFrame]]],
     *,
-    join_strategy="backward",
-    drop_null=False,
+    join_strategy: _AsOfStrategy ="backward",
+    null_handling: _NullStrategy="drop",
     keep_joining_column=False,
 ) -> list[AssociatedTrialSegements]:
-    """Transform a "Chunk and associated list" to "list of associated chunks"
+    """Segment Tobii dataframes with corresponding RealEye dataframes.
+     
+    Assumes both have "timestamp" column, accurate to the millisecond (at least) per coordinate.
 
     Algorithm:
         given a list of tuple[pl.DataFrame, list[pl.DataFrame]] representing tobii and RealEye, resp.
@@ -36,9 +42,27 @@ def join_chunks_as_segments(
 
     Arguments:
         associated_chunks: list of matched tobii dataframe with all the RE dataframes per stimulus
-
+        join_strategy: strategy for joining the "timestamp" columns of the associated chunks. One of 
+            Essentially, whether to look "backward", "forward", or to the "nearest" value when filling in the RealEye values.
+            - backward: a future RealEye value will be matched to the last Tobii row before it chronologically
+            - forward: a past RealEye value will be matched to the first Tobii row after it chronologically
+            - nearest: RealEye values seek to minimize the time to the Tobii value, thereby finding the "nearest" match
+            
+            See pl.DataFrame.join_asof() documentation for the nuanced details.
+            (https://docs.pola.rs/api/python/stable/reference/dataframe/api/polars.DataFrame.join_asof.html#polars.DataFrame.join_asof)
+        null_handling: strategy to fill in the null values in Tobii data. Strategy can be one of
+            - drop: drop/cut the rows (both Tobii and RealEye) that 
+            - forward: forward fill any nulls with the last seen non-null value
+            - backward: back fill from the first/next non-null value
+            - complex: In our experience, the nulls were at the head and tail of the sequence, so this performs a back fill
+                before a subsequent forward fill.
+        keep_joining_column: whether to keep the RealEye timestamps (called "timestamp_right") after the data are aligned
+            and merged into a single dataframe.
     Returns:
-        subsegments of the Tobii df joined on the time column of the RE df, per the algorithm
+        subsegments of the Tobii df joined on the time column of the RE df, per the algorithm, of at least 5 columns
+        - timestamp
+        - X, Y: coordinates for the Tobii data points
+        - X_re, Y_re: coordinates for the RealEye data points, 
     """
     output = []
     for tobii_df, re_dfs in associated_chunks:
@@ -59,10 +83,20 @@ def join_chunks_as_segments(
                 & (pl.col("timestamp") <= re_df["timestamp"].max())
             )
             # associated.drop_nulls(["X", "Y"])
-            if drop_null:
-                # NOTE: important to make sure Tobii's nothing don't crowd in
-                # NOTE: this can be 10% of the data and shouldn't be done lightly.
-                associated = associated.drop_nulls()
+            match null_handling:
+                case "backward":
+                    associated = associated.fill_null(strategy="backward")
+                case "forward":
+                    associated = associated.fill_null(strategy="forward")
+                case "drop":
+                    # NOTE: important to make sure Tobii's nothing don't crowd in
+                    # NOTE: this can be 10% of the data and shouldn't be done lightly.
+                    associated = associated.drop_nulls()
+                case "complex":
+                    associated = (associated
+                                  .fill_null(strategy="forward")
+                                  .fill_null(strategy="backward"))
+
             segmented_associations.append(associated)
 
         output.append(AssociatedTrialSegements(trial_name, segmented_associations))
@@ -121,7 +155,9 @@ def render_point_stream_video_with_opencv(
     try:
         num_trials = min(n_images_to_show, len(stimulus_image_paths), len(tobii_re_merge.segments))
         
-        for i_trial, (img_path, tobii_re_xy) in enumerate(zip(stimulus_image_paths, tobii_re_merge.segments)):
+        # NOTE(stephen): num_trials is used to enforce control flow i.e. prevent unnecessary iterations in conjunction
+        # with zip()'s default preference for the tuples
+        for i_trial, img_path, tobii_re_xy in zip(range(num_trials),stimulus_image_paths, tobii_re_merge.segments):
             # Get the pre-loaded image data
             # NOTE: OpenCV loads images in BGR format, not RGB. Be mindful if matplotlib interactions...
             raw_image = images_in_memory[img_path]
