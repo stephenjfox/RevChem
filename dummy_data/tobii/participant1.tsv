@@ -1,5 +1,5 @@
-"Recording date","Recording start time","Recording timestamp","Gaze point X","Gaze point Y"
-"01-08-2025","10:55:00.000","0",100,200
-"01-08-2025","10:55:00.000","1000",110,210
-"01-08-2025","10:55:00.000","2000",120,220
-"01-08-2025","10:55:00.000","3000",130,230
+Recording date	Recording date UTC	Recording start time	Recording timestamp	Gaze point X	Gaze point Y	csv_source	Recording start time UTC
+01-08-2025	01-08-2025	10:55:00.000	0	100	200	participant1.csv	0
+01-08-2025	01-08-2025	10:55:00.000	1000	110	210	participant1.csv	1000
+01-08-2025	01-08-2025	10:55:00.000	2000	120	220	participant1.csv	2000
+01-08-2025	01-08-2025	10:55:00.000	3000	130	230	participant1.csv	3000

@@ -23,11 +23,8 @@ from .tobii import COLUMN_RENAMING_TOBII_TO_CSV
 
 # %% ../nbs/07_high_level_api.ipynb 4
 from .common import datetime_to_stamp
+from .data.export import load_tobii_individual
 from .realeye import read_realeye_csv
-from RevChem.data.export import (
-    load_tobii_individual,
-    rekeyed, # needed for the patch to GroupFrames, used on
-)
 from .tobii import COLUMNS_TOBII
 
 
@@ -114,14 +111,9 @@ def generate_participant_videos_from_files(
             n_images_to_show=4,
         )
 
+
 # %% ../nbs/07_high_level_api.ipynb 5
-from .common import datetime_to_stamp
-from .realeye import read_realeye_csv
-from RevChem.data.export import (
-    load_tobii_individual,
-    rekeyed, # needed for the patch to GroupFrames, used on 
-)
-from .tobii import COLUMNS_TOBII
+from .data.export import rekeyed  # needed for the patch to GroupFrames, used on
 
 
 def generate_single_participant_video_from_files(
@@ -168,7 +160,9 @@ def generate_single_participant_video_from_files(
 
     # 2. Load and process Tobii data
     tobii_df = load_tobii_individual(
-        tobii_tsv_path, columns=COLUMNS_TOBII, renaming=COLUMN_RENAMING_TOBII_TO_CSV,
+        tobii_tsv_path,
+        columns=COLUMNS_TOBII,
+        renaming=COLUMN_RENAMING_TOBII_TO_CSV,
         # clean_func=lambda fname: fname
     )
 
@@ -191,7 +185,11 @@ def generate_single_participant_video_from_files(
     render_point_stream_video_with_opencv(
         stimuli_image_paths,
         trial_data,
-        output_file_name=Path(video_output_dir, run_output_dir_name, trial_data.trial_name_or_id).expanduser().as_posix(),
+        output_file_name=Path(
+            video_output_dir, run_output_dir_name, trial_data.trial_name_or_id
+        )
+        .expanduser()
+        .as_posix(),
         export_fps=60,
         n_images_to_show=4,
     )
