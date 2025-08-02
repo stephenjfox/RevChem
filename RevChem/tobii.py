@@ -34,15 +34,19 @@ from .common import group_by
 
 # %% ../nbs/01_tobii_resolve.ipynb 20
 def tobii_timestamp_to_datetime(
-    datetime_col: str = "Recording start datetime UTC", # column with the recording start datetime, UTC or TZ-specific.
-    timestamp_col: str = "Recording timestamp", # the integer column representing the microseconds since the recording started
+    datetime_col: str = "Recording start datetime UTC",
+    timestamp_col: str = "Recording timestamp",
     *,
-    overwrite: bool = True, # Whether, the `timestamp_col` will have a datetime type in the result, or (if False) a new column is created
+    overwrite: bool = True,
 ) -> pl.DataFrame:
-    """Update `timestamp_col` to be an increasing datetime rather than the default (i64 or int).
-
+    """Update `timestamp_col` to be an increasing datetime rather than the default (i6g4 or int).
     Corrects the `timestamp_col` of `df` to be a `pl.Datetime`, to ease legibility and computation.
     Sums the `timestamp_col` with that of the reference `datetime_col`, incrementing the time forward.
+
+    Args:
+        datetime_col (str): The name of the column containing the recording start datetime.
+        timestamp_col (str): The name of the column containing the timestamp in microseconds.
+        overwrite (bool): Whether to overwrite the `timestamp_col` with the new datetime values.
 
     Returns:
         A dataframe with the described change to the `timestamp_col`
@@ -58,9 +62,18 @@ def read_tobii_individual_tsv(
     path_to_tsv: str,
     schema_overrides: dict[str, pl.DataType] = {},
     *,
-    change_timestamp_to_datetime: bool = True,  # whether to use this record's derived datetime to calculate per-observation datetimestamps in "Recording timestamp"
+    change_timestamp_to_datetime: bool = True,
 ) -> pl.DataFrame:
-    "Reads a trial-exported Tobii TSV, with the minimal columns that we need"
+    """Reads a trial-exported Tobii TSV, with the minimal columns that we need.
+
+    Args:
+        path_to_tsv (str): The path to the TSV file.
+        schema_overrides (dict[str, pl.DataType], optional): A dictionary of schema overrides for the polars `read_csv` function. Defaults to {}.
+        change_timestamp_to_datetime (bool, optional): Whether to convert the timestamp column to datetime objects. Defaults to True.
+
+    Returns:
+        A polars DataFrame with the data from the TSV file.
+    """
     individual_tsv = pl.read_csv(
         path_to_tsv,
         separator="\t",
@@ -153,14 +166,29 @@ from .realeye import iter_parse_raw_data
 # %% ../nbs/01_tobii_resolve.ipynb 40
 from typing import Iterable
 def itersize(any_iter: Iterable) -> int:
-    """Get the size of an iterator."""
+    """Get the size of an iterator.
+
+    Args:
+        any_iter (Iterable): The iterator to get the size of.
+
+    Returns:
+        The size of the iterator.
+    """
     count = 0
-    for _ in any_iter: count += 1
+    for _ in any_iter:
+        count += 1
     return count
 
 # %% ../nbs/01_tobii_resolve.ipynb 41
 def enhance_realeye_metadata(realeye_df: pl.DataFrame) -> pl.DataFrame:
-    "Decorate the RealEye metadata (typed or not) with addition information"
+    """Decorate the RealEye metadata (typed or not) with addition information.
+
+    Args:
+        realeye_df (pl.DataFrame): The RealEye dataframe to enhance.
+
+    Returns:
+        The enhanced RealEye dataframe.
+    """
     # use pl.Struct to dynamically instruct the strong typing in Rust (which drives Polars)
     re_coord_type = pl.Struct({"gaze_point_x": pl.Int64, "gaze_point_y": pl.Int64})
     return realeye_df.with_columns(
@@ -183,7 +211,15 @@ def enhance_realeye_metadata(realeye_df: pl.DataFrame) -> pl.DataFrame:
 def read_realeye_raw_gazes_csv(
     path_to_csv: str | Path, decorated: bool = True
 ) -> pl.DataFrame:
-    "Real the RealEye raw-gazes.csv, decorating with field of RealEyeStruct if `decorated` == True"
+    """Read the RealEye raw-gazes.csv, decorating with field of RealEyeStruct if `decorated` == True.
+
+    Args:
+        path_to_csv (str | Path): The path to the CSV file.
+        decorated (bool, optional): Whether to decorate the dataframe with the RealEyeStruct fields. Defaults to True.
+
+    Returns:
+        A polars DataFrame with the data from the CSV file.
+    """
     raw_csv = pl.read_csv(
         path_to_csv,
         columns=["participant_id", "item_id", "test_created_at", "test_raw_data"],
@@ -214,11 +250,17 @@ class RealEyeStruct(NamedTuple):
 # %% ../nbs/01_tobii_resolve.ipynb 45
 from datetime import timedelta, datetime, UTC
 
-def unroll_realeye_dataframe_into_record_dataframes(df: pl.DataFrame):
-    """Convert each row of a RealEye-exported CSV into a dataframe of timestamped records
-    
+def unroll_realeye_dataframe_into_record_dataframes(df: pl.DataFrame) -> list[pl.DataFrame]:
+    """Convert each row of a RealEye-exported CSV into a dataframe of timestamped records.
+
     We assume 30 Hz data is given, and so concatenate all dataframes in the order they are ingested/converted
     with a rolling 1/30th of a second added to the time of the first record encountered.
+
+    Args:
+        df (pl.DataFrame): The RealEye dataframe to unroll.
+
+    Returns:
+        A list of dataframes, where each dataframe is a single record from the original dataframe.
     """
     time_inc = timedelta(seconds=1/30) # 30 Hz data
     dfs = []
@@ -400,7 +442,16 @@ def count_group_backwards(
     *,
     time_inc: timedelta = timedelta(seconds=1 / 30),
 ) -> pl.DataFrame:
-    """Count the group backwards from the end time."""
+    """Count the group backwards from the end time.
+
+    Args:
+        end_time (datetime): The end time of the group.
+        group (Iterable[pl.DataFrame]): The group of dataframes to count backwards.
+        time_inc (timedelta, optional): The time increment to use. Defaults to timedelta(seconds=1 / 30).
+
+    Returns:
+        A dataframe with the group counted backwards from the end time.
+    """
     # (old) debug stuff:
     # print(f"{type(group) = } {type(group[0]) = }")
     concatted_df = pl.concat([df for df in group])
@@ -417,11 +468,17 @@ def count_group_backwards(
     return df_with_time_corrected
 
 
-def unroll_realeye_df_counting_backwards(df: pl.DataFrame):
+def unroll_realeye_df_counting_backwards(df: pl.DataFrame) -> dict[datetime, pl.DataFrame]:
     """Convert RealEye Raw record to the unrolled record, with the start_time interpreted as the end time.
 
     Video evidence suggests that the start_time field is actually more like the "recording completed at" time
     i.e. the end time.
+
+    Args:
+        df (pl.DataFrame): The RealEye dataframe to unroll.
+
+    Returns:
+        A dictionary of dataframes, where each dataframe is a single record from the original dataframe.
     """
     time_inc = timedelta(seconds=1 / 30)  # 30 Hz data
     dfs_to_group = []
@@ -454,17 +511,32 @@ def unroll_realeye_df_counting_backwards(df: pl.DataFrame):
 
 
 # %% ../nbs/01_tobii_resolve.ipynb 53
-def apply(s, transform):
-    """Apply a transformation to a string."""
+def apply(s: str, transform: callable) -> str:
+    """Apply a transformation to a string.
+
+    Args:
+        s (str): The string to transform.
+        transform (callable): The transformation to apply.
+
+    Returns:
+        The transformed string.
+    """
     return transform(s)
 
 def clean_tsv_file_name(fname: str) -> str:
-    """Clean the tsv file name."""
+    """Clean the tsv file name.
+
+    Args:
+        fname (str): The file name to clean.
+
+    Returns:
+        The cleaned file name.
+    """
     from functools import reduce
 
     transformations = [
         lambda s: s.split("1.Realeye1,2,3")[1].strip(),
-        lambda s: s.rstrip(".tsv")
+        lambda s: s.rstrip(".tsv"),
     ]
 
     return reduce(apply, transformations, fname)
@@ -478,7 +550,14 @@ from .common import partition, Predicate
 def filter_to_newyear_and_sort_by_timestamp(
     dfs: list[pl.DataFrame],
 ) -> list[pl.DataFrame]:
-    """Filter to data from the new year and sort by timestamp."""
+    """Filter to data from the new year and sort by timestamp.
+
+    Args:
+        dfs (list[pl.DataFrame]): A list of dataframes to filter and sort.
+
+    Returns:
+        A list of dataframes filtered to data from the new year and sorted by timestamp.
+    """
     return sorted(
         filter(
             lambda df: (df["timestamp"][0] >= datetime(2025, 1, 1, tzinfo=UTC)),
@@ -521,6 +600,9 @@ def filter_tobii_dfs_by_new_years_heuristics(
     """
     Remove dataframes that do not meet our heuristic and discovered criteria for a valid Tobii trial.
 
+    Args:
+        dfs (list[pl.DataFrame]): A list of Tobii dataframes to filter.
+
     Returns:
         All of the DataFrames that meet all filtering heuristics and invariants
     """
@@ -546,6 +628,9 @@ def filter_realeye_dfs_by_new_years_heuristics(
     """
     Remove dataframes that do not meet our heuristic and discovered criteria for a valid Tobii trial.
 
+    Args:
+        dfs (list[pl.DataFrame]): A list of RealEye dataframes to filter.
+
     Returns:
         All of the DataFrames that meet all filtering heuristics and invariants
     """
@@ -564,32 +649,41 @@ def filter_realeye_dfs_by_new_years_heuristics(
 from datetime import datetime, timedelta
 import random
 
-def generate_random_datetimes(start, count, max_minutes_range):
+def generate_random_datetimes(start: datetime, count: int, max_minutes_range: int) -> list[datetime]:
     """
-    # Function to generate random datetime list
-    # Parameters: start datetime, number of datetimes, max minutes range
+    Function to generate random datetime list.
+
+    Args:
+        start (datetime): The start datetime.
+        count (int): The number of datetimes to generate.
+        max_minutes_range (int): The maximum number of minutes to add to the start datetime.
+
+    Returns:
+        A list of random datetimes.
     """
-    return [start + timedelta(minutes=random.randint(0, max_minutes_range)) for _ in range(count)]
+    return [
+        start + timedelta(minutes=random.randint(0, max_minutes_range))
+        for _ in range(count)
+    ]
 
 
 # %% ../nbs/01_tobii_resolve.ipynb 66
 def find_tobii_realeye_df_pairs(
-    tobii_dfs: list[pl.DataFrame], realeye_dfs: list[pl.DataFrame],
+    tobii_dfs: list[pl.DataFrame],
+    realeye_dfs: list[pl.DataFrame],
     *,
-    _logging: bool = False
+    _logging: bool = False,
 ) -> list[tuple[pl.DataFrame, pl.DataFrame]]:
     """
-    Algorithm
+    Find pairs of Tobii and RealEye dataframes that are closest in time.
 
-    0. Prep: dfs -> tuples of starting time and df, to ease the comparison function
-        - alt: write a comparator that accesses that property
-    1. Brutal force
-        1. For each tobii session, find the closest RealEye session
-        2. For logging purposes, articulate the `pl.Duration` or `datetime.TimeDelta`: `end - start` for RealEye
-    2. More intelligent
-        1. Pop found indices from the available indices to search, so you don't double-select a `DataFrame`
-        2. Use the `source_tsv` property as a key into a dictionary, to store the found DataFrame once its found
-            - or its index. Doesn't really matter
+    Args:
+        tobii_dfs (list[pl.DataFrame]): A list of Tobii dataframes.
+        realeye_dfs (list[pl.DataFrame]): A list of RealEye dataframes.
+        _logging (bool, optional): Whether to print logging information. Defaults to False.
+
+    Returns:
+        A list of tuples, where each tuple contains a Tobii dataframe and a RealEye dataframe.
     """
     times_tobii = [df["timestamp"][0] for df in tobii_dfs]
     times_realeye = [df["timestamp"][0] for df in realeye_dfs]
@@ -631,12 +725,22 @@ def export_ordered_pairs(
         "X": "X_tobii",
         "Y": "Y_tobii",
     },
-    exported_column_names=[
+    exported_column_names: list[str] = [
         "timestamp",
         "X",
         "Y",
     ],
 ):
+    """Export the ordered pairs of dataframes to CSV files.
+
+    Args:
+        df_pairs (list[tuple[pl.DataFrame, pl.DataFrame]]): A list of tuples, where each tuple contains a Tobii dataframe and a RealEye dataframe.
+        output_dir_root (Path): The root directory to export the files to.
+        output_suffix (Path): The suffix to add to the output directory.
+        include_joined_output (bool, optional): Whether to include a joined output file. Defaults to False.
+        tobii_export_naming (dict[str, str], optional): A dictionary of column renames for the Tobii dataframe.
+        exported_column_names (list[str], optional): A list of column names to export.
+    """
     # exported_column_names += list(sorted(tobii_export_naming.values()))
     export_dir = output_dir_root / output_suffix
     for tobii_df, re_df in df_pairs:
