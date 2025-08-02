@@ -54,6 +54,7 @@ def split_segment(segment_df: pl.DataFrame) -> TypedSegment:
     )
 
 def retype_associated_data(data: AssociatedTrialSegements) -> AssociatedTrialRetyped:
+    """Retype the associated data to a more convenient format."""
     return AssociatedTrialRetyped(
         data.trial_name_or_id,
         [split_segment(seg) for seg in data.segments]

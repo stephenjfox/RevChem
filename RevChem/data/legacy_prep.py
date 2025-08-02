@@ -52,6 +52,7 @@ def separate_aligned_to_source(
     *,
     correct_naming: bool=False
 ) -> tuple[pl.DataFrame, pl.DataFrame]:
+    """Separate an aligned dataframe into its source dataframes."""
 
     selector_tobii = cs.ends_with("_tobii")
     selector_realeye = cs.ends_with("_RE")
@@ -67,6 +68,7 @@ def separate_aligned_to_source(
 
 # %% ../../nbs/02_data_inspect.ipynb 32
 def df_to_coordinate_stream(df: pl.DataFrame, x_: str = "x", y_: str = "y"):
+    """Convert a dataframe to a stream of coordinates."""
     return list(df[[x_, y_]].iter_rows())
 
 # %% ../../nbs/02_data_inspect.ipynb 39

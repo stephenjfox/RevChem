@@ -9,6 +9,7 @@ from collections import defaultdict
 from typing import Any, Callable, Iterable
 
 def group_by(grouper: Callable, items: Iterable[Any]) -> dict[any, any]:
+    """Group items by a given function"""
     groups = defaultdict(list)
     for item in items:
         groups[grouper(item)].append(item)
@@ -35,9 +36,11 @@ def partition(
 
 # %% ../nbs/00_common.ipynb 6
 def first(iterable):
+    """Returns the first item in an iterable"""
     _it = iter(iterable)
     return next(_it)
 def second(iterable):
+    """Returns the second item in an iterable"""
     _it = iter(iterable)
     next(_it)
     return next(_it)
@@ -49,6 +52,7 @@ from itertools import takewhile
 from typing import Iterable
 
 def take_n(iterable, *, n=5) -> Iterable:
+    """Take n items from an iterable"""
     count = 0
     for x in takewhile(lambda _: count < n, iterable):
         yield x
@@ -59,6 +63,7 @@ def take_n(iterable, *, n=5) -> Iterable:
 from datetime import datetime, UTC
 
 def dt_str_now() -> str:
+    """Get the current time as a string in the format YYYY-MM-DD-HHMM"""
     return datetime.now(UTC).strftime("%Y-%m-%d-%H%M")
 
 def date_str_now() -> str:
@@ -78,6 +83,7 @@ def datetime_to_stamp(dt: datetime = None) -> str:
 
 # %% ../nbs/00_common.ipynb 10
 def list_concat(lists: list[list]) -> list:
+    """Concatenate a list of lists into a single list"""
     result = [
         item for l_ in lists for item in l_
     ]

@@ -36,6 +36,7 @@ class Resettable(Iterable[T_out]):
 
 
 def iter_parse_raw_to_GazeInfo(raw_data: str) -> Iterator[GazeInfo]:
+    """Iteratively parse raw gaze data into GazeInfo objects."""
     for sextuple in iter_parse_raw_data(raw_data):
         if (length_ := len(sextuple)) > 6:
             # indicates that the RealEye system captured a mouse click. Nothing more.
@@ -44,6 +45,7 @@ def iter_parse_raw_to_GazeInfo(raw_data: str) -> Iterator[GazeInfo]:
 
 
 def resettable_iter_raw(test_raw_data: str):
+    """Create a resettable iterator for raw gaze data."""
     return Resettable(test_raw_data, iter_parse_raw_to_GazeInfo)
 
 
@@ -113,6 +115,7 @@ from tempfile import TemporaryDirectory
 EXPORT_ROOT = Path(TemporaryDirectory(delete=False).name, f"{dt_str_now()}-python-outputs").resolve()
 EXPORT_ROOT.mkdir(parents=True, exist_ok=True)
 def run_realeye_df_group_statistics(dfs: list[pl.DataFrame]):
+    """Calculate and export statistics for groups of RealEye dataframes."""
     grouped = group_by(lambda df: df["test_created_at"][0], dfs)
     group_statistics = pl.DataFrame(
         [[group_key, len(group)] for group_key, group in grouped.items()],
@@ -208,6 +211,7 @@ def pipeline_raw_realeye_to_timed_dataframe(
     debug: bool = False,  # whether we output the first row of each dataframe, to debug what we're looking at.
     dt_timestamp_col: str = "time_since_start",  # name for the datetime timestamp column in the output dataframes
 ):
+    """Pipeline to convert raw RealEye data to a timed dataframe."""
     real_eye_rows: list[RealEyeRawRow] = sorted(
         map(RealEyeRawRow.from_row_tuples, re_raw_df.rows()),
         # sorted by item_id, leveraging that list.index(...) -> ordinal position

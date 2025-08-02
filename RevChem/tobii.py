@@ -153,6 +153,7 @@ from .realeye import iter_parse_raw_data
 # %% ../nbs/01_tobii_resolve.ipynb 40
 from typing import Iterable
 def itersize(any_iter: Iterable) -> int:
+    """Get the size of an iterator."""
     count = 0
     for _ in any_iter: count += 1
     return count
@@ -399,6 +400,7 @@ def count_group_backwards(
     *,
     time_inc: timedelta = timedelta(seconds=1 / 30),
 ) -> pl.DataFrame:
+    """Count the group backwards from the end time."""
     # (old) debug stuff:
     # print(f"{type(group) = } {type(group[0]) = }")
     concatted_df = pl.concat([df for df in group])
@@ -452,9 +454,12 @@ def unroll_realeye_df_counting_backwards(df: pl.DataFrame):
 
 
 # %% ../nbs/01_tobii_resolve.ipynb 53
-def apply(s, transform): return transform(s)
+def apply(s, transform):
+    """Apply a transformation to a string."""
+    return transform(s)
 
 def clean_tsv_file_name(fname: str) -> str:
+    """Clean the tsv file name."""
     from functools import reduce
 
     transformations = [
@@ -473,6 +478,7 @@ from .common import partition, Predicate
 def filter_to_newyear_and_sort_by_timestamp(
     dfs: list[pl.DataFrame],
 ) -> list[pl.DataFrame]:
+    """Filter to data from the new year and sort by timestamp."""
     return sorted(
         filter(
             lambda df: (df["timestamp"][0] >= datetime(2025, 1, 1, tzinfo=UTC)),

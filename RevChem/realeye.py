@@ -122,6 +122,7 @@ def read_realeye_csv(
     column_subset: list[str] = REALEYE_COLUMNS,
     column_types: dict[str, pl.DataType] = REALEYE_COLUMNS_AND_TYPE,
 ):
+    """Read a RealEye CSV file into a Polars DataFrame."""
     return pl.read_csv(
         path_to_raw_csv,
         columns=column_subset,

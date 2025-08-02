@@ -106,6 +106,7 @@ def join_chunks_as_segments(
 
 # %% ../../nbs/05_image_gen_by_segments.ipynb 11
 def select_trial(trial_name: str, joined_segments: list[AssociatedTrialSegements]):
+    """Select a trial by name from a list of joined segments."""
     results = list(
         filter(lambda association: association.trial_name_or_id == trial_name, joined_segments)
     )
@@ -125,6 +126,7 @@ def render_point_stream_video_with_opencv(
     output_file_name="animation",
     n_images_to_show: int = None,
 ):
+    """Render a video from a stream of points using OpenCV."""
     if n_images_to_show is None:
         n_images_to_show = len(stimulus_image_paths)
 
@@ -200,6 +202,7 @@ from ..common import date_str_now, dt_str_now
 def run_video_generation(
     trial_name: str, *, joined_segments: list[AssociatedTrialSegements], stimuli_paths: list[Path], n_stimuli=3
 ):
+    """Run the video generation process."""
     # prepared trial data that we're going to be turning into a video
     trial_data = select_trial(trial_name, joined_segments)
 
