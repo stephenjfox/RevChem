@@ -9,7 +9,15 @@ from collections import defaultdict
 from typing import Any, Callable, Iterable
 
 def group_by(grouper: Callable, items: Iterable[Any]) -> dict[any, any]:
-    """Group items by a given function"""
+    """Group items by a given function.
+
+    Args:
+        grouper (Callable): A function that returns a key to group by.
+        items (Iterable[Any]): A list of items to be grouped.
+
+    Returns:
+        A dictionary with the grouped items.
+    """
     groups = defaultdict(list)
     for item in items:
         groups[grouper(item)].append(item)
@@ -23,15 +31,25 @@ type Predicate[T] = Callable[[T], bool]
 
 
 def partition(
-    criterion: Predicate[T],  # Filtering condition
-    items: Iterable[T],  # Objects that may meet the criterion
-) -> tuple[list[T], list[T]]:  # Tuple of (matches, misses)
-    "Apply `criterion` to `items` to generate a list of those matching and not matching"
+    criterion: Predicate[T],
+    items: Iterable[T],
+) -> tuple[list[T], list[T]]:
+    """Apply `criterion` to `items` to generate a list of those matching and not matching.
+
+    Args:
+        criterion (Predicate[T]): A function that returns True if the item meets the criterion.
+        items (Iterable[T]): A list of items to be partitioned.
+
+    Returns:
+        A tuple containing two lists: one with items that meet the criterion and one with items that do not.
+    """
     matches, misses = [], []
     for item in items:
-        if criterion(item): matches.append(item)
-        else: misses.append(item)
-    
+        if criterion(item):
+            matches.append(item)
+        else:
+            misses.append(item)
+
     return matches, misses
 
 # %% ../nbs/00_common.ipynb 6
@@ -51,8 +69,16 @@ snd = second
 from itertools import takewhile
 from typing import Iterable
 
-def take_n(iterable, *, n=5) -> Iterable:
-    """Take n items from an iterable"""
+def take_n(iterable: Iterable, *, n: int = 5) -> Iterable:
+    """Take n items from an iterable.
+
+    Args:
+        iterable (Iterable): The iterable to take items from.
+        n (int, optional): The number of items to take. Defaults to 5.
+
+    Yields:
+        The next item in the iterable.
+    """
     count = 0
     for x in takewhile(lambda _: count < n, iterable):
         yield x
@@ -71,7 +97,14 @@ def date_str_now() -> str:
     return datetime.now(UTC).strftime("%Y-%m-%d")
 
 def datetime_to_stamp(dt: datetime = None) -> str:
-    """Convert datetime to format YYYYMMDDHHMM (e.g. 202507171140)"""
+    """Convert datetime to format YYYYMMDDHHMM (e.g. 202507171140).
+
+    Args:
+        dt (datetime, optional): The datetime object to convert. Defaults to None, in which case the current time is used.
+
+    Returns:
+        A string representation of the datetime in YYYYMMDDHHMM format.
+    """
     if dt is None:
         dt = datetime.now()
     return dt.strftime("%Y%m%d%H%M")
@@ -83,8 +116,13 @@ def datetime_to_stamp(dt: datetime = None) -> str:
 
 # %% ../nbs/00_common.ipynb 10
 def list_concat(lists: list[list]) -> list:
-    """Concatenate a list of lists into a single list"""
-    result = [
-        item for l_ in lists for item in l_
-    ]
+    """Concatenate a list of lists into a single list.
+
+    Args:
+        lists (list[list]): A list of lists to concatenate.
+
+    Returns:
+        A single list containing all the items from the input lists.
+    """
+    result = [item for l_ in lists for item in l_]
     return result

@@ -12,18 +12,40 @@ from json import loads as load_json_str
 from typing import Any, Iterable
 
 def parse_list(text: str, start_index: int) -> tuple[int, list]:
-    "parse a list out of the text, returning a tuple of (index after the list, the list)"
+    """Parse a list out of the text, returning a tuple of (index after the list, the list).
+
+    Args:
+        text (str): The text to parse.
+        start_index (int): The index to start parsing from.
+
+    Returns:
+        A tuple containing the index after the list and the list itself.
+    """
     ends = [("[", start_index)]
     ind = start_index + 1
     while ends:
         match text[ind]:
-            case "\"": ends.append('"')
-            case "'": ends.append('"')
-            case "[": ends.append("[")
-            case "{": ends.append("{")
-            case _: None
+            case "\"":
+                ends.append('"')
+            case "'":
+                ends.append('"')
+            case "[":
+                ends.append("[")
+            case "{":
+                ends.append("{")
+            case _:
+                None
 
 def iter_parse_raw_data(raw_data: str) -> Iterable[Any]:
+    """Iteratively parse the raw data string from RealEye.
+
+    Args:
+        raw_data (str): The raw data string to parse.
+
+    Yields:
+        A list of numbers from the raw data string.
+    """
+
     def test_numbers_str_invariant(numbers: str):
         if not isinstance(numbers, str):
             raise TypeError("Numbers string should be a str")
@@ -31,35 +53,41 @@ def iter_parse_raw_data(raw_data: str) -> Iterable[Any]:
             raise ValueError(f"Receive {numbers} for argument 'numbers', excepted value")
         if "," not in numbers:
             raise IndexError(f"Could not find comma in list argument {numbers}")
-    
-    def numbers_string_to_list(numbers: str) -> list[int|float]:
+
+    def numbers_string_to_list(numbers: str) -> list[int | float]:
         return [
-            num_int if (num_int := int(num_str)) == (num_f := float(num_str)) else num_f
+            num_int
+            if (num_int := int(num_str)) == (num_f := float(num_str))
+            else num_f
             for num_str in numbers.split(",")
         ]
 
     # assuming a list of lists,
     # convert from "[[...],[...],[...],[...]]" -> "...],[...],[...],[..."
-    text_data_of_listlists = raw_data[2:-2].replace(" ", "") # delete whitespace
+    text_data_of_listlists = raw_data[2:-2].replace(" ", "")  # delete whitespace
     # to ease the algorithm to follow
     CONST_SPLIT_TARGET = "],["
-    (numbers, rest) = split_res = text_data_of_listlists.split(CONST_SPLIT_TARGET, maxsplit=1) # one at a time.
-    
+    (numbers, rest) = split_res = text_data_of_listlists.split(
+        CONST_SPLIT_TARGET, maxsplit=1
+    )  # one at a time.
+
     while split_res:
         test_numbers_str_invariant(numbers)
         yield numbers_string_to_list(numbers)
 
-        split_res = rest.split(CONST_SPLIT_TARGET, maxsplit=1) # one at a time.
+        split_res = rest.split(CONST_SPLIT_TARGET, maxsplit=1)  # one at a time.
         match split_res:
             case [_, _]:
                 # iterate again
                 # print(f"Iterate: {numbers = }")
                 (numbers, rest) = split_res
-            case [numbers,]: 
+            case [
+                numbers,
+            ]:
                 # final iteration, yield the last list
                 # print(f"Final: {numbers = }")
                 yield numbers_string_to_list(numbers)
-                split_res = None # terminate loop condition
+                split_res = None  # terminate loop condition
             case _:
                 raise ValueError(f"Should be unreachable state: {split_res = }")
 
@@ -121,8 +149,19 @@ def read_realeye_csv(
     path_to_raw_csv: str | Path,
     column_subset: list[str] = REALEYE_COLUMNS,
     column_types: dict[str, pl.DataType] = REALEYE_COLUMNS_AND_TYPE,
-):
-    """Read a RealEye CSV file into a Polars DataFrame."""
+) -> pl.DataFrame:
+    """Read a RealEye CSV file into a Polars DataFrame.
+
+    Args:
+        path_to_raw_csv (str | Path): The path to the RealEye CSV file.
+        column_subset (list[str], optional): A list of columns to read from the CSV file.
+            Defaults to REALEYE_COLUMNS.
+        column_types (dict[str, pl.DataType], optional): A dictionary of column names and their types.
+            Defaults to REALEYE_COLUMNS_AND_TYPE.
+
+    Returns:
+        A Polars DataFrame containing the data from the CSV file.
+    """
     return pl.read_csv(
         path_to_raw_csv,
         columns=column_subset,

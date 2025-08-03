@@ -41,14 +41,13 @@ def generate_single_participant_video_from_files(
     stimuli_image_paths: list[str | Path],
     use_cache: bool = True,
 ):
-    """Uses RevChem low-level modules to produce an MP4 from the provided data
+    """Uses RevChem low-level modules to produce an MP4 from the provided data.
 
     Args:
-        realeye_csv_path: Path to the raw-gazes.csv
-        tobii_tsv_path: Path to a single participant's trial. Name will be used to name output video
-        video_output_dir: Directory with write permissions, where the MP4 will be written
-        use_cache: Whether to save the data to disk. Defaults to True.
-        realeye_stimulus_items_in_order: Identifiers of the stimuli provided in/through RealEye, in the order
+        realeye_csv_path (str): Path to the raw-gazes.csv
+        tobii_tsv_path (str): Path to a single participant's trial. Name will be used to name output video
+        video_output_dir (str): Directory with write permissions, where the MP4 will be written
+        realeye_stimulus_items_in_order (list[str]): Identifiers of the stimuli provided in/through RealEye, in the order
             the are presented.
             Originally, we intended to do this ordering programmatically, but were thwarted by the fact that
             RealEye's output rows are not ordered by "display order" but the order in which the stimuli were
@@ -58,13 +57,14 @@ def generate_single_participant_video_from_files(
             RealEye UI, inspect the order in which you are showing your images, and to copy-paste in-order the
             stimuli "Item ID"s as they appear. The order in the exported raw-gazes(-denoised).csv are not
             guaranteed to be accurate.
-        stimuli_image_paths: Paths to the images to be shown as stimuli, in order.
+        stimuli_image_paths (list[str  |  Path]): Paths to the images to be shown as stimuli, in order.
             The easiest way to comply with this is to (very easily) download the stimuli to an isolated folder
             on your test machine, name then in lexicographical order (such that when you "Sort by Name"
             in File Explorer or Finder, they are in the order you would show a participant) and then load them
             with
             >>> from pathlib import Path
             >>> stimuli_image_paths = sorted(Path("my isolated stimuli directory").glob("*.jpg"))
+        use_cache (bool, optional): Whether to save the data to disk. Defaults to True.
     """
     # 1. Load and process RealEye data
     re_df = read_realeye_csv(realeye_csv_path)
@@ -124,11 +124,10 @@ def generate_participant_videos_from_files(
     """Uses RevChem low-level modules to produce MP4s from the provided data for a whole directory of participants.
 
     Args:
-        realeye_csv_path: absolute or relative path to the "raw gazes" CSV
-        tobii_tsv_dir_path: absolute or relative path to the directory of all associated Tobii data
-        video_output_dir: Directory with write permissions, where the MP4 will be written
-        use_cache: Whether to save the data to disk. Defaults to True.
-        realeye_stimulus_items_in_order: Identifiers of the stimuli provided in/through RealEye, in the order
+        realeye_csv_path (str): absolute or relative path to the "raw gazes" CSV
+        tobii_tsv_dir_path (str): absolute or relative path to the directory of all associated Tobii data
+        video_output_dir (str): Directory with write permissions, where the MP4 will be written
+        realeye_stimulus_items_in_order (list[str]): Identifiers of the stimuli provided in/through RealEye, in the order
             the are presented.
             Originally, we intended to do this ordering programmatically (e.g. based on infered timings),
             but were thwarted by the fact that RealEye's output rows are not ordered by "display order" but
@@ -138,13 +137,14 @@ def generate_participant_videos_from_files(
             The easiest way to comply with this is to go into the RealEye UI, inspect the order in which
             you are showing your images, and to copy-paste in-order the stimuli "Item ID"s as they appear.
             In short, the order in the exported raw-gazes(-denoised).csv are not guaranteed to be accurate.
-        stimuli_image_paths: Paths to the images to be shown as stimuli, in order.
+        stimuli_image_paths (list[str  |  Path]): Paths to the images to be shown as stimuli, in order.
             The easiest way to comply with this is to (very easily) download the stimuli to an isolated folder
             on your test machine, name then in lexicographical order (such that when you "Sort by Name"
             in File Explorer or Finder, they are in the order you would show a participant) and then load them
             with
             >>> from pathlib import Path
             >>> stimuli_image_paths = sorted(Path("my isolated stimuli directory").glob("*.jpg"))
+        use_cache (bool, optional): Whether to save the data to disk. Defaults to True.
     """
     # 1. Load and process RealEye data
     re_df = read_realeye_csv(realeye_csv_path)
