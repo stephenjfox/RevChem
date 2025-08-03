@@ -2,11 +2,12 @@
 
 # %% auto 0
 __all__ = ['add_step_columns', 'TypedSegment', 'AssociatedTrialRetyped', 'split_segment', 'retype_associated_data',
-           'global_summary', 'rolling_summary', 'fixation_segments', 'aoi_from_fixations']
+           'global_summary', 'rolling_summary', 'fixation_segments', 'aoi_from_fixations', 'trajectory_iou']
 
 # %% ../../nbs/06_timeseries_stats.ipynb 3
 from pathlib import Path
 import polars as pl
+from shapely.geometry import Polygon, MultiPoint
 
 
 def add_step_columns(df: pl.DataFrame,
@@ -319,3 +320,57 @@ def aoi_from_fixations(
     )
 
     return aoi_stats.sort("aoi_id")
+
+
+# %% ../../nbs/06_timeseries_stats.ipynb 33
+def trajectory_iou(
+    traj1: pl.DataFrame,
+    traj2: pl.DataFrame,
+    *,
+    x_col: str = "X",
+    y_col: str = "Y",
+) -> float:
+    """
+    Calculate the Intersection over Union (IoU) of two trajectories.
+
+    The IoU is calculated based on the convex hulls of the trajectories.
+
+    Parameters
+    ----------
+    traj1 : pl.DataFrame
+        DataFrame for the first trajectory. Must contain `x_col` and `y_col`.
+    traj2 : pl.DataFrame
+        DataFrame for the second trajectory. Must contain `x_col` and `y_col`.
+    x_col : str, default "X"
+        Name of the column containing x-coordinates.
+    y_col : str, default "Y"
+        Name of the column containing y-coordinates.
+
+    Returns
+    -------
+    float
+        The IoU value, between 0.0 and 1.0.
+    """
+    # Extract points and create MultiPoint objects
+    points1 = traj1.select([x_col, y_col]).to_numpy()
+    points2 = traj2.select([x_col, y_col]).to_numpy()
+
+    if len(points1) < 3 or len(points2) < 3:
+        return 0.0
+
+    # Compute convex hulls
+    poly1 = MultiPoint(points1).convex_hull
+    poly2 = MultiPoint(points2).convex_hull
+
+    # Ensure polygons are valid
+    if not poly1.is_valid or not poly2.is_valid:
+        return 0.0
+
+    # Calculate intersection and union
+    intersection_area = poly1.intersection(poly2).area
+    union_area = poly1.union(poly2).area
+
+    if union_area == 0:
+        return 0.0
+
+    return intersection_area / union_area
